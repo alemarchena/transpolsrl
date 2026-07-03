@@ -40,7 +40,7 @@ build/Release
 # Carpetas generadas dentro del cliente
 client/node_modules/
 client/dist/
-server/uploads/bonos
+server/uploads/bonos/
 
 # Dependency directories
 node_modules/
