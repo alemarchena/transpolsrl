@@ -1,0 +1,47 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_transpol
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: templays_juta
+      MYSQL_USER: templays_alemarchena
+      MYSQL_PASSWORD: Picapiedra2887
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data_transpol:/var/lib/mysql
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: php_transpol
+    restart: always
+    volumes:
+      - ./server:/var/www/html
+    ports:
+      - "8000:80"
+    environment:
+      DB_HOST: mysql
+      DB_USER: templays_alemarchena
+      DB_PASSWORD: Picapiedra2887
+      DB_NAME: templays_juta
+      APP_ENV: docker
+    depends_on:
+      - mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin_transpol
+    restart: always
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8080:80"
+
+volumes:
+  mysql_data_transpol:

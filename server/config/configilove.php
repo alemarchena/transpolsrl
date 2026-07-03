@@ -1,0 +1,3 @@
+<?php
+define('ILOVEPDF_PROJECT_KEY', 'project_public_7704013dd68bf4b58c799daf2c4b92fa_ejxS1d5ead8a3ba3fa29f53ece5f3d06c779c');
+define('ILOVEPDF_SECRET_KEY', 'secret_key_ce6624c002f76c824416c95b4a137757_3JWoO9aca23d6cf90c4a0d8bdc52f92c8d74e');
