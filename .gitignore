@@ -37,6 +37,10 @@ bower_components
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
 
+# Carpetas generadas dentro del cliente
+client/node_modules/
+client/dist/
+
 # Dependency directories
 node_modules/
 jspm_packages/
