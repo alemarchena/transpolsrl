@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBsyW2VH5uhOBG6zLwAkJxdYWGw-nvHXBo",
+  apiKey: "",
   authDomain: "templayreact.firebaseapp.com",
   projectId: "templayreact",
   storageBucket: "templayreact.firebasestorage.app",
