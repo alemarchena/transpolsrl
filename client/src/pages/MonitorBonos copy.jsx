@@ -19,7 +19,6 @@ export default function MonitorBonos() {
     return mesActual === 0 ? 12 : mesActual // Si enero, usar diciembre, sino mes anterior
   })
   const [mesFin, setMesFin] = useState(new Date().getMonth() + 1)
-  const [tipoBono, setTipoBono] = useState("mensual") // "todos", "mensual", "sac1", "sac2"
   const [pagina, setPagina] = useState(1)
   const [total, setTotal] = useState(0)
   const [estadisticas, setEstadisticas] = useState({
@@ -55,8 +54,8 @@ export default function MonitorBonos() {
   }
 
   const obtenerDatos = async () => {
-    // Validaciones: si no hay año o el mesInicio > mesFin no hacemos nada (solo para mensual)
-    if (!anio) {
+    // Validaciones: si no hay año o el mesInicio > mesFin no hacemos nada
+    if (!anio || mesInicio > mesFin) {
       setDatos([])
       setTotal(0)
       setEstadisticas({ firmados: 0, pendientes: 0, total: 0 })
@@ -78,7 +77,6 @@ export default function MonitorBonos() {
           anio: Number.parseInt(anio),
           mesInicio,
           mesFin,
-          tipoBono,
           pagina,
           limite,
         }),
@@ -97,12 +95,11 @@ export default function MonitorBonos() {
           anio: Number.parseInt(anio),
           mesInicio,
           mesFin,
-          tipoBono,
         }),
       })
       const dataEstadisticas = await resEstadisticas.json()
 
-      // Capitalizar nombres
+      // Capitalizar nombres en los datos paginados
       if (data.success && Array.isArray(data.data)) {
         data.data.forEach(item => {
           if (item.persona) {
@@ -150,6 +147,7 @@ export default function MonitorBonos() {
     setLoading(false)
   }
 
+  // Función para obtener TODOS los datos sin paginación
   const obtenerTodosLosDatos = async () => {
     try {
       const timestamp = Date.now()
@@ -165,7 +163,6 @@ export default function MonitorBonos() {
           anio: Number.parseInt(anio),
           mesInicio,
           mesFin,
-          tipoBono,
           pagina: 1,
           limite: 999999,
         }),
@@ -203,33 +200,33 @@ export default function MonitorBonos() {
 
     setLoading(true)
     try {
+      // Crear PDF en orientación landscape
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
       })
       
+      // Título
       pdf.setFontSize(18)
       pdf.setTextColor(31, 41, 55)
       pdf.text("Monitoreo de Bonos", 14, 15)
       
+      // Subtítulo con período
       pdf.setFontSize(12)
       pdf.setTextColor(55, 65, 81)
-      let subtitulo = `Período: ${meses[mesInicio - 1]} - ${meses[mesFin - 1]} de ${anio}`
-      if (tipoBono !== 'todos') {
-        const tipoTexto = tipoBono === 'mensual' ? 'Mensual' : tipoBono === 'sac1' ? 'Sac 1' : 'Sac 2'
-        subtitulo += ` (Tipo: ${tipoTexto})`
-      }
-      pdf.text(subtitulo, 14, 25)
+      pdf.text(`Período: ${meses[mesInicio - 1]} - ${meses[mesFin - 1]} de ${anio}`, 14, 25)
       
+      // Preparar datos para la tabla
       const tableData = todosLosDatos.map(d => [
-        d.persona || '-',
+        d.persona,
         d.mes || '-',
         d.anio || '-',
         d.firmado_por ? 'Firmado' : 'Pendiente',
         d.firmado_fecha ? formatearFechaHora(d.firmado_fecha) : '-'
       ])
       
+      // Crear tabla automática
       autoTable(pdf, {
         startY: 32,
         head: [['Persona', 'Mes', 'Año', 'Estado', 'Fecha Firma']],
@@ -251,25 +248,28 @@ export default function MonitorBonos() {
           valign: 'middle',
         },
         columnStyles: {
-          0: { cellWidth: 70 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 35 },
-          4: { cellWidth: 50 },
+          0: { cellWidth: 70 }, // Persona
+          1: { cellWidth: 30 }, // Mes
+          2: { cellWidth: 25 }, // Año
+          3: { cellWidth: 35 }, // Estado
+          4: { cellWidth: 50 }, // Fecha Firma
         },
         alternateRowStyles: {
           fillColor: [249, 250, 251],
         },
         margin: { top: 32, right: 14, bottom: 20, left: 14 },
         didDrawPage: function(data) {
+          // Resumen al final de cada página
           const finalY = pdf.internal.pageSize.height - 15
           pdf.setFontSize(8)
           pdf.setTextColor(107, 114, 128)
           
           if (data.pageNumber === Math.ceil(tableData.length / 40)) {
+            // Última página - mostrar resumen completo
             const firmados = todosLosDatos.filter(d => d.firmado_por).length
             const pendientes = todosLosDatos.filter(d => !d.firmado_por).length
             const porcentaje = Math.round((firmados / todosLosDatos.length) * 100)
+            
             pdf.text(`Total registros: ${todosLosDatos.length} | Firmados: ${firmados} | Pendientes: ${pendientes} | % Cumplimiento: ${porcentaje}%`, 14, finalY)
             pdf.text(`Generado: ${new Date().toLocaleString('es-AR')}`, 14, finalY + 5)
           } else {
@@ -278,8 +278,7 @@ export default function MonitorBonos() {
         }
       })
       
-      const nombreArchivo = `monitoreo_bonos_${anio}_${mesInicio}_${mesFin}${tipoBono !== 'todos' ? '_' + tipoBono : ''}.pdf`
-      pdf.save(nombreArchivo)
+      pdf.save(`monitoreo_bonos_${anio}_${mesInicio}_${mesFin}.pdf`)
       toast.success("PDF generado correctamente")
     } catch (error) {
       console.error("Error generando PDF:", error)
@@ -300,13 +299,8 @@ export default function MonitorBonos() {
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet("Monitoreo Bonos")
       
-      let titulo = `Monitoreo de Bonos - ${meses[mesInicio - 1]} a ${meses[mesFin - 1]} de ${anio}`
-      if (tipoBono !== 'todos') {
-        const tipoTexto = tipoBono === 'mensual' ? 'Mensual' : tipoBono === 'sac1' ? 'Sac 1' : 'Sac 2'
-        titulo += ` (Tipo: ${tipoTexto})`
-      }
       worksheet.mergeCells('A1:F1')
-      worksheet.getCell('A1').value = titulo
+      worksheet.getCell('A1').value = `Monitoreo de Bonos - ${meses[mesInicio - 1]} a ${meses[mesFin - 1]} de ${anio}`
       worksheet.getCell('A1').font = { size: 14, bold: true }
       worksheet.getCell('A1').alignment = { horizontal: 'center' }
       
@@ -353,8 +347,7 @@ export default function MonitorBonos() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      const nombreArchivo = `monitoreo_bonos_${anio}_${mesInicio}_${mesFin}${tipoBono !== 'todos' ? '_' + tipoBono : ''}.xlsx`
-      a.download = nombreArchivo
+      a.download = `monitoreo_bonos_${anio}_${mesInicio}_${mesFin}.xlsx`
       a.click()
       window.URL.revokeObjectURL(url)
       
@@ -387,7 +380,6 @@ export default function MonitorBonos() {
           anio: Number.parseInt(anio),
           mesInicio,
           mesFin,
-          tipoBono,
         }),
       })
 
@@ -396,8 +388,7 @@ export default function MonitorBonos() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        const nombreArchivo = `bonos_firmados_${anio}_${mesInicio}_${mesFin}${tipoBono !== 'todos' ? '_' + tipoBono : ''}.zip`
-        a.download = nombreArchivo
+        a.download = `bonos_firmados_${anio}_${mesInicio}_${mesFin}.zip`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
@@ -414,44 +405,30 @@ export default function MonitorBonos() {
     setLoading(false)
   }
 
+  // 🔴 IMPORTANTE: useEffect para recargar cuando cambian los filtros o la página
   useEffect(() => {
     obtenerDatos()
-  }, [anio, mesInicio, mesFin, tipoBono, pagina])
+  }, [anio, mesInicio, mesFin, pagina]) // Agregadas las dependencias faltantes
 
   useEffect(() => {
     registrarse()
   }, [])
 
+  // 🔴 NUEVO: Resetear página a 1 cuando cambian los filtros
   useEffect(() => {
     setPagina(1)
-  }, [anio, mesInicio, mesFin, tipoBono])
-
-  // Determinar si el rango de meses está deshabilitado
-  const isRangoMesesDisabled = tipoBono === 'sac1' || tipoBono === 'sac2'
+  }, [anio, mesInicio, mesFin])
 
   return (
     <div className="container mx-auto px-4 py-6">
       <h2 className="text-2xl font-bold mb-4">Monitoreo de Bonos</h2>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-2 mb-4 items-center">
-        {/* Selector de tipo de bono */}
-        <select
-          value={tipoBono}
-          onChange={(e) => setTipoBono(e.target.value)}
-          className="border p-2 rounded"
-        >
-          <option value="todos">Todos los bonos</option>
-          <option value="mensual">Bonos mensuales</option>
-          <option value="sac1">Sac 1</option>
-          <option value="sac2">Sac 2</option>
-        </select>
-
+      <div className="flex flex-wrap gap-2 mb-4">
         <select
           value={mesInicio}
           onChange={(e) => setMesInicio(Number.parseInt(e.target.value))}
-          className={`border p-2 rounded ${isRangoMesesDisabled ? 'bg-gray-100 text-gray-500' : ''}`}
-          disabled={isRangoMesesDisabled}
+          className="border p-2 rounded"
         >
           {meses.map((m, i) => (
             <option key={m} value={i + 1}>
@@ -459,12 +436,11 @@ export default function MonitorBonos() {
             </option>
           ))}
         </select>
-        <span className={`p-2 ${isRangoMesesDisabled ? 'text-gray-400' : ''}`}>a</span>
+        <span className="p-2">a</span>
         <select 
           value={mesFin} 
           onChange={(e) => setMesFin(Number.parseInt(e.target.value))} 
-          className={`border p-2 rounded ${isRangoMesesDisabled ? 'bg-gray-100 text-gray-500' : ''}`}
-          disabled={isRangoMesesDisabled}
+          className="border p-2 rounded"
         >
           {meses.map((m, i) => (
             <option key={m} value={i + 1}>
@@ -559,7 +535,9 @@ export default function MonitorBonos() {
               {datos.length > 0 ? (
                 datos.map((d, idx) => (
                   <tr key={`${d.idPersona}-${idx}`} className="text-center border-t">
-                    <td className="p-2 border">{d.persona}</td>
+                    <td className="p-2 border">
+                      {d.persona}
+                    </td>
                     <td className="p-2 border">{d.mes || "-"}</td>
                     <td className="p-2 border">{d.anio || "-"}</td>
                     <td className="p-2 border">
